@@ -31,11 +31,25 @@ TODO : for runthrough 2 (instruction translation)
 #define MAX_LINE_LENGTH 255
 #define MAX_LABEL_LEN 20
 #define MAX_SYMBOLS 255
+#define NUM_OPCODES 28
 	
   enum
 	{
 	   DONE, OK, EMPTY_LINE
 	};
+
+typedef char opcode[5];
+
+opcode opcodes[28] = 
+{
+"ADD", "AND", "HALT", "JMP", "JSR", "JSRR", "LDB",
+"LDW", "LEA", "NOP", "NOT", "RET", "LSHF", "RSHFL",
+"RSHFA", "RTI", "STB", "STW", "TRAP", "XOR", "BRn",
+"BRz", "BRp", "BRnz", "BRnp", "BRzp", "BR", "BRnzp"
+};
+
+
+
 
 // Symbol Table
 
@@ -45,6 +59,10 @@ typedef struct Label {
 } Label;
 
 Label symbol_table[MAX_SYMBOLS] = {0};
+
+FILE* infile = NULL;
+FILE* outfile = NULL;
+
 
 //Parsing Command Line Arguments
 void parseCLI(int argc, char* argv[]) {
@@ -62,10 +80,13 @@ void parseCLI(int argc, char* argv[]) {
      printf("output file name = '%s'\n", oFileName);
 }
 
-
-//Opening And Closing Files
-FILE* infile = NULL;
-FILE* outfile = NULL;
+int isOpcode(char *str) {
+  int i = 0;
+  for (i; i < NUM_OPCODES; i++) {
+    if (strcmp(opcodes[i], str) == 0) {
+      return 1;
+    } 
+}
 
 int
 main2(int argc, char* argv[]) {
@@ -215,6 +236,7 @@ void BuildSymbolTable(FILE *pInFile, Label symbol_table[]) {
   int lRet;
   int i = 0;
   int prog_start;
+  int line_count = 0;
 
   do{
     lRet = readAndParse(pInFile, lLine, &lLabel, 
@@ -224,12 +246,13 @@ void BuildSymbolTable(FILE *pInFile, Label symbol_table[]) {
           prog_start = toNum(lArg1);
         }
         if (strlen(lLabel) && !(strlen(lOpcode))){
-          symbol_table[i].address = ;
-          strncpy(symbol_table[i].name, lLabel, MAX_LABEL_LEN);
+          symbol_table[i].address = prog_start + line_count;
+          strcpy(symbol_table[i].name, lLabel);
           symbol_table[i].name[MAX_LABEL_LEN] = '\0';
           i++;
         }
       }
+      line_count++;
   } while (lRet != DONE);
 }
 
@@ -249,8 +272,7 @@ main (int argc, char* argv[]) {
        exit(4);
      }
 
-     Label *start_ptr = &symbol_table[0];
-     BuildSymbolTable(infile, start_ptr);
+     BuildSymbolTable(infile, symbol_table);
 
      fclose(infile);
      fclose(outfile);
