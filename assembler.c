@@ -38,18 +38,17 @@ TODO : for runthrough 2 (instruction translation)
 	   DONE, OK, EMPTY_LINE
 	};
 
+int prog_start;
+
 typedef char opcode[5];
 
 opcode opcodes[28] = 
 {
-"ADD", "AND", "HALT", "JMP", "JSR", "JSRR", "LDB",
-"LDW", "LEA", "NOP", "NOT", "RET", "LSHF", "RSHFL",
-"RSHFA", "RTI", "STB", "STW", "TRAP", "XOR", "BRn",
-"BRz", "BRp", "BRnz", "BRnp", "BRzp", "BR", "BRnzp"
+"add", "and", "halt", "jmp", "jsr", "jsrr", "ldb",
+"ldw", "lea", "nop", "not", "ret", "lshf", "rshfl",
+"rshfa", "rti", "stb", "stw", "trap", "xor", "brn",
+"brz", "brp", "brnz", "brnp", "brzp", "br", "brnzp"
 };
-
-
-
 
 // Symbol Table
 
@@ -63,103 +62,67 @@ Label symbol_table[MAX_SYMBOLS] = {0};
 FILE* infile = NULL;
 FILE* outfile = NULL;
 
-
-//Parsing Command Line Arguments
-void parseCLI(int argc, char* argv[]) {
-
-     char *prgName   = NULL;
-     char *iFileName = NULL;
-     char *oFileName = NULL;
-
-     prgName   = argv[0];
-     iFileName = argv[1];
-     oFileName = argv[2];
-
-     printf("program name = '%s'\n", prgName);
-     printf("input file name = '%s'\n", iFileName);
-     printf("output file name = '%s'\n", oFileName);
-}
-
 int isOpcode(char *str) {
-  int i = 0;
-  for (i; i < NUM_OPCODES; i++) {
-    if (strcmp(opcodes[i], str) == 0) {
-      return 1;
-    } 
+    for (int i = 0; i < NUM_OPCODES; i++) {
+      if (strcmp((opcodes[i]), str) == 0) {
+        return 1;
+      }
+    }
+    return -1;
 }
 
-int
-main2(int argc, char* argv[]) {
-	
-     /* open the source file */
-     infile = fopen(argv[1], "r");
-     outfile = fopen(argv[2], "w");
-		 
-     if (!infile) {
-       printf("Error: Cannot open file %s\n", argv[1]);
-       exit(4);
-		 }
-     if (!outfile) {
-       printf("Error: Cannot open file %s\n", argv[2]);
-       exit(4);
-     }
-
-     /* Do stuff with files */
-
-     fclose(infile);
-     fclose(outfile);
-}
-
-int readAndParse( FILE * pInfile, char * pLine, char ** pLabel, char
+int readAndParse
+( 
+  FILE * pInfile, char * pLine, char ** pLabel, char
 	** pOpcode, char ** pArg1, char ** pArg2, char ** pArg3, char ** pArg4
-	)
-	{
-	  char * lRet, * lPtr;
-	  int i;
-	  if( !fgets( pLine, MAX_LINE_LENGTH, pInfile ) )
-		  return( DONE );
-	  for( i = 0; i < strlen( pLine ); i++ )
-		  pLine[i] = tolower( pLine[i] );
-    /* convert entire line to lowercase */
+)
+{
+  char * lRet, * lPtr;
+  int i;
+  if( !fgets( pLine, MAX_LINE_LENGTH, pInfile ) )
+    return( DONE );
+  for( i = 0; i < strlen( pLine ); i++ )
+    pLine[i] = tolower( pLine[i] );
+  /* convert entire line to lowercase */
 
-	  *pLabel = *pOpcode = *pArg1 = *pArg2 = *pArg3 = *pArg4 = pLine + strlen(pLine);
+  *pLabel = *pOpcode = *pArg1 = *pArg2 = *pArg3 = *pArg4 = pLine + strlen(pLine);
 
-	   /* ignore the comments */
-	  lPtr = pLine;
-	  while( *lPtr != ';' && *lPtr != '\0' &&*lPtr != '\n' ) 
-		  lPtr++;
+    /* ignore the comments */
+  lPtr = pLine;
+  while( *lPtr != ';' && *lPtr != '\0' &&*lPtr != '\n' ) 
+    lPtr++;
 
-	  *lPtr = '\0';
-	   if( !(lPtr = strtok( pLine, "\t\n ," ) ) ) 
-		return( EMPTY_LINE );
+  *lPtr = '\0';
+    if( !(lPtr = strtok( pLine, "\t\n ," ) ) ) 
+  return( EMPTY_LINE );
 
-	   if(isOpcode( lPtr ) == -1 && lPtr[0] != '.' ) /* found a label */
-	   {
-		*pLabel = lPtr;
-		if( !( lPtr = strtok( NULL, "\t\n ," ) ) ) return( OK );
-	   }
-	   
-           *pOpcode = lPtr;
+    if(isOpcode( lPtr ) == -1 && lPtr[0] != '.' ) /* found a label */
+    {
+  *pLabel = lPtr;
+  if( !( lPtr = strtok( NULL, "\t\n ," ) ) ) return( OK );
+    }
+    
+          *pOpcode = lPtr;
 
-	   if( !( lPtr = strtok( NULL, "\t\n ," ) ) ) return( OK );
-	   
-           *pArg1 = lPtr;
-	   
-           if( !( lPtr = strtok( NULL, "\t\n ," ) ) ) return( OK );
+    if( !( lPtr = strtok( NULL, "\t\n ," ) ) ) return( OK );
+    
+          *pArg1 = lPtr;
+    
+          if( !( lPtr = strtok( NULL, "\t\n ," ) ) ) return( OK );
 
-	   *pArg2 = lPtr;
-	   if( !( lPtr = strtok( NULL, "\t\n ," ) ) ) return( OK );
+    *pArg2 = lPtr;
+    if( !( lPtr = strtok( NULL, "\t\n ," ) ) ) return( OK );
 
-	   *pArg3 = lPtr;
+    *pArg3 = lPtr;
 
-	   if( !( lPtr = strtok( NULL, "\t\n ," ) ) ) return( OK );
+    if( !( lPtr = strtok( NULL, "\t\n ," ) ) ) return( OK );
 
-	   *pArg4 = lPtr;
+    *pArg4 = lPtr;
 
-	   return( OK );
-	}
+    return( OK );
+}
 
-	/* Note: MAX_LINE_LENGTH, OK, EMPTY_LINE, and DONE are defined values */
+/* Note: MAX_LINE_LENGTH, OK, EMPTY_LINE, and DONE are defined values */
 
 int
 toNum( char * pStr )
@@ -230,50 +193,63 @@ toNum( char * pStr )
 
 
 void BuildSymbolTable(FILE *pInFile, Label symbol_table[]) {
-  char lLine[MAX_LINE_LENGTH + 1], *lLabel, *lOpcode, 
-  *lArg1,*lArg2, *lArg3, *lArg4;
+    char lLine[MAX_LINE_LENGTH + 1], *lLabel, *lOpcode, 
+    *lArg1,*lArg2, *lArg3, *lArg4;
 
-  int lRet;
-  int i = 0;
-  int prog_start;
-  int line_count = 0;
+    int lRet;
+    int i = 0;
+    int line_count = 0;
 
-  do{
-    lRet = readAndParse(pInFile, lLine, &lLabel, 
-      &lOpcode, &lArg1, &lArg2, &lArg3, &lArg4);
-      if (lRet != DONE && lRet != EMPTY_LINE){
-        if (strcmp(lOpcode, ".orig")) {
-          prog_start = toNum(lArg1);
+    do{
+      lRet = readAndParse(pInFile, lLine, &lLabel, 
+        &lOpcode, &lArg1, &lArg2, &lArg3, &lArg4);
+        if (lRet != DONE && lRet != EMPTY_LINE){
+          if (!strcmp(lOpcode, ".orig")) {
+            prog_start = toNum(lArg1);
+          }
+          if (strlen(lLabel)){
+            symbol_table[i].address = prog_start + (line_count*2);
+            strcpy(symbol_table[i].name, lLabel);
+            symbol_table[i].name[MAX_LABEL_LEN] = '\0';
+            i++;
+          }
         }
-        if (strlen(lLabel) && !(strlen(lOpcode))){
-          symbol_table[i].address = prog_start + line_count;
-          strcpy(symbol_table[i].name, lLabel);
-          symbol_table[i].name[MAX_LABEL_LEN] = '\0';
-          i++;
-        }
-      }
-      line_count++;
-  } while (lRet != DONE);
+        line_count++;
+    } while (lRet != DONE);
 }
 
-int
-main (int argc, char* argv[]) {
-	
-     /* open the source file */
-     infile = fopen(argv[1], "r");
-     outfile = fopen(argv[2], "w");
-		 
-     if (!infile) {
-       printf("Error: Cannot open file %s\n", argv[1]);
-       exit(4);
-		 }
-     if (!outfile) {
-       printf("Error: Cannot open file %s\n", argv[2]);
-       exit(4);
-     }
+int main (int argc, char* argv[]) {
+    
+    // Parse command line arguments 
+    char *prgName   = NULL;
+    char *iFileName = NULL;
+    char *oFileName = NULL;  
 
-     BuildSymbolTable(infile, symbol_table);
+    prgName   = argv[0];
+    iFileName = argv[1];
+    oFileName = argv[2];
 
-     fclose(infile);
-     fclose(outfile);
+    /* open the source file */
+    infile = fopen(iFileName, "r");
+    outfile = fopen(oFileName, "w");
+    
+    if (!infile) {
+      printf("Error: Cannot open file %s\n", argv[1]);
+      exit(4);
+    }
+    if (!outfile) {
+      printf("Error: Cannot open file %s\n", argv[2]);
+      exit(4);
+    }
+
+    BuildSymbolTable(infile, symbol_table);
+
+    int i = 0;
+    while (!strcmp(symbol_table[i].name, 0)){
+      printf("Name: %s\nAddress: %d\n\n", symbol_table[i].name, symbol_table[i].address);
+    }
+    printf("Program Start: %d\n", prog_start);
+
+    fclose(infile);
+    fclose(outfile);
 }
