@@ -40,7 +40,7 @@ TODO : for runthrough 2 (instruction translation)
 
 int prog_start;
 
-typedef char opcode[5];
+typedef char opcode[6];
 
 opcode opcodes[28] = 
 {
@@ -192,7 +192,7 @@ toNum( char * pStr )
 }
 
 
-void BuildSymbolTable(FILE *pInFile, Label symbol_table[]) {
+int BuildSymbolTable(FILE *pInFile, Label symbol_table[]) {
     char lLine[MAX_LINE_LENGTH + 1], *lLabel, *lOpcode, 
     *lArg1,*lArg2, *lArg3, *lArg4;
 
@@ -216,6 +216,7 @@ void BuildSymbolTable(FILE *pInFile, Label symbol_table[]) {
         }
         line_count++;
     } while (lRet != DONE);
+    return i;
 }
 
 int main (int argc, char* argv[]) {
@@ -242,10 +243,9 @@ int main (int argc, char* argv[]) {
       exit(4);
     }
 
-    BuildSymbolTable(infile, symbol_table);
+    int symbol_count = BuildSymbolTable(infile, symbol_table);
 
-    int i = 0;
-    while (!strcmp(symbol_table[i].name, 0)){
+    for(int i=0; i<symbol_count; i++){
       printf("Name: %s\nAddress: %d\n\n", symbol_table[i].name, symbol_table[i].address);
     }
     printf("Program Start: %d\n", prog_start);
