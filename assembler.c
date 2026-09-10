@@ -53,45 +53,40 @@ TODO : for runthrough 2 (instruction translation)
 
 int prog_start;
 
-typedef char opcode[6]; // @Braden, can you explain this line to me, why not just char* opcodes[28]
+typedef struct {
+  char name[6]; 
+  int digit;
+} opcode;
 
-opcode opcodes[28] = 
-{
-"add", "and", "halt", "jmp", "jsr", "jsrr", "ldb",
-"ldw", "lea", "nop", "not", "ret", "lshf", "rshfl",
-"rshfa", "rti", "stb", "stw", "trap", "xor", "brn",
-"brz", "brp", "brnz", "brnp", "brzp", "br", "brnzp"
-};
-
-const int opcodes_dec[28] = {
-  1,   // add
-  5,   // and
-  15,  // halt   (pseudo-op for TRAP x25 — same opcode as trap)
-  12,  // jmp
-  4,   // jsr    (bit[11]=1 distinguishes from jsrr)
-  4,   // jsrr   (bit[11]=0)
-  2,   // ldb
-  6,   // ldw
-  14,  // lea
-  0,   // nop    (BR with n=z=p=0 — same opcode as br)
-  9,   // not    (encoded as XOR DR,SR,#-1)
-  12,  // ret    (JMP R7 — same opcode as jmp)
-  13,  // lshf
-  13,  // rshfl  (same opcode as lshf; bit[4]/bit[5] differ)
-  13,  // rshfa  (same opcode as lshf/rshfl)
-  8,   // rti
-  3,   // stb
-  7,   // stw
-  15,  // trap
-  9,   // xor
-  0,   // brn    (same opcode as br; n/z/p bits differ)
-  0,   // brz
-  0,   // brp
-  0,   // brnz
-  0,   // brnp
-  0,   // brzp
-  0,   // br
-  0    // brnzp
+opcode opcodes[28] = {
+    {"add",    1},
+    {"and",    5},
+    {"halt",   15},  // same opcode as trap x25
+    {"jmp",    12},
+    {"jsr",    4},   // bit[11]=1 vs jsrr
+    {"jsrr",   4},   // bit[11]=0
+    {"ldb",    2},
+    {"ldw",    6},
+    {"lea",    14},
+    {"nop",    0},   // same opcode as br
+    {"not",    9},   // encoded as XOR DR,SR,#-1
+    {"ret",    12},  // JMP R7 — same opcode as jmp
+    {"lshf",   13},
+    {"rshfl",  13},  // same opcode as lshf; bit[4]/bit[5] differ
+    {"rshfa",  13},  // same opcode as lshf/rshfl
+    {"rti",    8},
+    {"stb",    3},
+    {"stw",    7},
+    {"trap",   15},
+    {"xor",    9},
+    {"brn",    0},   // same opcode as br; n/z/p bits differ
+    {"brz",    0},
+    {"brp",    0},
+    {"brnz",   0},
+    {"brnp",   0},
+    {"brzp",   0},
+    {"br",     0},
+    {"brnzp",  0}
 };
 
 char* invalid[4] = 
