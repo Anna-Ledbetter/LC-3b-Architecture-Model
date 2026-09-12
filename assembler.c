@@ -34,6 +34,11 @@ TODO : for runthrough 2 (instruction translation)
   
 */
 
+/* TODO : Sept 11
+1. take care of arg decode --> type, ex) ADD imm vs Reg
+*/
+
+#include <cctype>
 #include <stdio.h> /* standard input/output library */
 #include <stdlib.h> /* Standard C Library */
 #include <string.h> /* String operations library */
@@ -51,42 +56,50 @@ TODO : for runthrough 2 (instruction translation)
 	   DONE, OK, EMPTY_LINE
 	};
 
+  // opcode types
+  enum {MATH, MEM, FIXED, SHIFT, TRAP, PC_OFFSET, JUMP};
+  
+  // arg types
+  enum {REGISTER, LABEL, NUM};
+
 int prog_start;
 
 typedef struct {
   char name[6]; 
-  int digit;
+  int binary;
+  int type;
 } opcode;
 
+
 opcode opcodes[28] = {
-    {"add",    1},
-    {"and",    5},
-    {"halt",   15},  // same opcode as trap x25
-    {"jmp",    12},
-    {"jsr",    4},   // bit[11]=1 vs jsrr
-    {"jsrr",   4},   // bit[11]=0
-    {"ldb",    2},
-    {"ldw",    6},
-    {"lea",    14},
-    {"nop",    0},   // same opcode as br
-    {"not",    9},   // encoded as XOR DR,SR,#-1
-    {"ret",    12},  // JMP R7 — same opcode as jmp
-    {"lshf",   13},
-    {"rshfl",  13},  // same opcode as lshf; bit[4]/bit[5] differ
-    {"rshfa",  13},  // same opcode as lshf/rshfl
-    {"rti",    8},
-    {"stb",    3},
-    {"stw",    7},
-    {"trap",   15},
-    {"xor",    9},
-    {"brn",    0},   // same opcode as br; n/z/p bits differ
-    {"brz",    0},
-    {"brp",    0},
-    {"brnz",   0},
-    {"brnp",   0},
-    {"brzp",   0},
-    {"br",     0},
-    {"brnzp",  0}
+  {"add",    0b0001000000000000, MATH},
+  {"and",    0b0101000000000000, MATH},
+  {"halt",   0b1111000000100101, FIXED},   // TRAP x25, fully fixed
+  {"jmp",    0b1100000000000000, JUMP},
+  {"jsr",    0b0100100000000000, PC_OFFSET},
+  {"jsrr",   0b0100000000000000, JUMP},
+  {"ldb",    0b0010000000000000, MEM},
+  {"ldw",    0b0110000000000000, MEM},
+  {"lea",    0b1110000000000000, MEM},
+  {"nop",    0b0000000000000000, FIXED},   // nzp=000, offset=0
+  {"not",    0b1001000000111111, MATH},
+  {"ret",    0b1100000111000000, FIXED},   // JMP with BaseR=R7 baked in
+  {"lshf",   0b1101000000000000, SHIFT},
+  {"rshfl",  0b1101000000010000, SHIFT},
+  {"rshfa",  0b1101000000110000, SHIFT},
+  {"rti",    0b1000000000000000, FIXED},
+  {"stb",    0b0011000000000000, MEM},
+  {"stw",    0b0111000000000000, MEM},
+  {"trap",   0b1111000000000000, TRAP},
+  {"xor",    0b1001000000000000, MATH},
+  {"brn",    0b0000100000000000, PC_OFFSET},
+  {"brz",    0b0000010000000000, PC_OFFSET},
+  {"brp",    0b0000001000000000, PC_OFFSET},
+  {"brnz",   0b0000110000000000, PC_OFFSET},
+  {"brnp",   0b0000101000000000, PC_OFFSET},
+  {"brzp",   0b0000011000000000, PC_OFFSET},
+  {"br",     0b0000111000000000, PC_OFFSET},
+  {"brnzp",  0b0000111000000000, PC_OFFSET}
 };
 
 char* invalid[4] = 
@@ -107,7 +120,7 @@ FILE* outfile = NULL;
 
 int isOpcode(char *str) {
     for (int i = 0; i < NUM_OPCODES; i++) {
-      if (strcmp((opcodes[i]), str) == 0) {
+      if (strcmp((opcodes[i].name), str) == 0) {
         return 1;
       }
     }
@@ -190,8 +203,11 @@ int readAndParse
 
 /* Note: MAX_LINE_LENGTH, OK, EMPTY_LINE, and DONE are defined values */
 
-int
-toNum( char * pStr )
+int sext(int num, int bits) {
+
+}
+
+int toNum( char * pStr )
 {
    char * t_ptr;
    char * orig_pStr;
@@ -257,6 +273,9 @@ toNum( char * pStr )
    }
 }
 
+int toBin(int num) {
+
+}
 
 int BuildSymbolTable(FILE *pInFile, Label symbol_table[]) {
     char lLine[MAX_LINE_LENGTH + 1], *lLabel, *lOpcode, 
@@ -277,7 +296,6 @@ int BuildSymbolTable(FILE *pInFile, Label symbol_table[]) {
             if (isValid(lLabel)){
               symbol_table[i].address = prog_start + (line_count*2);
               strcpy(symbol_table[i].name, lLabel);
-              symbol_table[i].name[MAX_LABEL_LEN] = '\0';
               i++;
             }
           }
@@ -296,6 +314,8 @@ int second_pass(FILE *pInFile, FILE *pOutfile) {
   int lRet;
   int i = 0;
   int line_count = 0;
+  int line_bin;
+  int curr_bit = 0;
 
   do{
     lRet = readAndParse(pInFile, lLine, &lLabel, 
@@ -309,6 +329,39 @@ int second_pass(FILE *pInFile, FILE *pOutfile) {
         if (!strcmp(lOpcode, ".end")) {
           return 0;
         }
+        
+        // add opcode to binary line
+        int i;
+        for (i=0; i<28; i++) {
+          if (!strcmp(lOpcode, opcodes[i].name)) {
+            line_bin = opcodes[i].binary;
+            curr_bit += 4;
+          }
+        }
+
+        switch (opcodes[i].type) 
+          case MATH:
+          int reg = atoi(&lArg1[1]); // only care about register number
+          
+
+        
+          
+          
+        
+
+        int arg_type( int *Line ) { // move out of function and under for loop!!!
+          char * Args[4] = {lArg1, lArg2, lArg3, lArg4}; // pass by val not ref, so it's read only (makes a copy var on)
+          for (int i = 0; i < 4; i++) {
+            // check if it's R, or 
+            if ()
+            if (isdigit(Args[i][0]) || (Args[i][0] == 'x') || (Args[i][0] == '#') || (Args[i][0] == '-')) {
+              toNum(Args[i]);
+            }
+            // else, LABEL
+          }
+        }
+
+      
 
         char lArg[MAX_LINE_LENGTH + 1];
         strcpy(lArg, lArg1);
