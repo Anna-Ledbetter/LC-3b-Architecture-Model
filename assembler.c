@@ -6,23 +6,32 @@ UTEID 2: AML6995
 */
 
 /*
-TODO :
+Questions :
   a. and other invalid words??? FOR?
   d. for char (can we treat the whole thing as a string?) : 
         is letter / num, add to array, else not a valid label - i don't even understand this question and I know I wrote it
   e. WHAT DO WE DO IF JUST NOT VALID CODE, RETURN ERROR? 
     --> don't have to handel this
-*/
 
-/* TODO : Sept 13
+TODO : Sept 13
   1. DONE - take care of arg decode --> type, ex) ADD imm vs Reg 
-  2. Add the print line per insteruction, not just pseudo-op
-  3. copy the reg code to all switch cases
-  4. we need a PC, so we can do Label - PC
+  2. MATH: negative NUM, Label
+  3. Add the print line per insteruction, not just pseudo-op
+  4. copy the reg code to all switch cases
+  5. we need a PC, so we can do Label - PC
+  6. cmd f "!!!" and "@Braden"
 
   TO TEST :
   1. arg_type() works
   2. how does nzp get stored for BR? just Arg1?
+
+  REAL TESTING
+  1. try all from the lab1 doc
+  2. try to think of edge cases --> compare to example assembler output
+  3. really hit negatives (for imm and Label offsets)
+  4. just .orig, blank file, other weird cases
+  5. ask TA (maddie tonight) even before runing test?
+  5. submit test cases
 
 
 */
@@ -351,7 +360,12 @@ int second_pass(FILE *pInFile, FILE *pOutfile) {
               line_bin += reg;
             }
             if (type == NUM){
+              // ADD if negative, sign extend first !!!
               line_bin += toNum(lArg3);
+            }
+            if (type == LABEL) {
+              // line_bin += (Label - PC+)
+              // but we need a PC+ we inc
             }
             break;
           }
