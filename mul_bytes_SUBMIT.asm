@@ -18,5 +18,5 @@ BRz DONE
 STB R1, R4, #3
 DONE HALT
 
-.End
 DATA .FILL 0x3100
+.End

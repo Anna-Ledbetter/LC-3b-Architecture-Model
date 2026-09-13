@@ -34,11 +34,17 @@ TODO : for runthrough 2 (instruction translation)
   
 */
 
-/* TODO : Sept 11
-1. take care of arg decode --> type, ex) ADD imm vs Reg
+/* TODO : Sept 13
+  1. DONE - take care of arg decode --> type, ex) ADD imm vs Reg 
+  2. copy the reg code to all switch cases
+
+  TO TEST :
+  1. arg_type() works
+  2. how does nzp get stored for BR? just Arg1?
+
+
 */
 
-#include <cctype>
 #include <stdio.h> /* standard input/output library */
 #include <stdlib.h> /* Standard C Library */
 #include <string.h> /* String operations library */
@@ -203,7 +209,7 @@ int readAndParse
 
 /* Note: MAX_LINE_LENGTH, OK, EMPTY_LINE, and DONE are defined values */
 
-int sext(int num, int bits) {
+int sext(int num, int bits) { // @Braden, what is this for?
 
 }
 
@@ -273,7 +279,7 @@ int toNum( char * pStr )
    }
 }
 
-int toBin(int num) {
+int toBin(int num) { // @Braden, what is this for?
 
 }
 
@@ -303,6 +309,16 @@ int BuildSymbolTable(FILE *pInFile, Label symbol_table[]) {
         line_count++;
     } while (lRet != DONE);
     return i;
+}
+
+int arg_type( char *pArg ) { // pass by val not ref, so it's read only (makes a copy var on)
+  if (pArg[0] == 'r') {
+    return REGISTER;
+  }
+  if (isdigit(pArg[0]) || (pArg[0] == 'x') || (pArg[0] == '#') || (pArg[0] == '-')) {
+    return NUM;
+  }
+  return LABEL;
 }
 
 int second_pass(FILE *pInFile, FILE *pOutfile) {
@@ -339,31 +355,68 @@ int second_pass(FILE *pInFile, FILE *pOutfile) {
           }
         }
 
-        switch (opcodes[i].type) 
-          case MATH:
-          int reg = atoi(&lArg1[1]); // only care about register number
-          
+        switch (opcodes[i].type) {
+          case MATH: {
+            int reg = atoi(&lArg1[1]); // only care about register number
+            line_bin += (reg * (1<<9) );
 
-        
-          
-          
-        
+            int reg = atoi(&lArg2[1]); 
+            line_bin += reg * (1<<9);
 
-        int arg_type( int *Line ) { // move out of function and under for loop!!!
-          char * Args[4] = {lArg1, lArg2, lArg3, lArg4}; // pass by val not ref, so it's read only (makes a copy var on)
-          for (int i = 0; i < 4; i++) {
-            // check if it's R, or 
-            if ()
-            if (isdigit(Args[i][0]) || (Args[i][0] == 'x') || (Args[i][0] == '#') || (Args[i][0] == '-')) {
-              toNum(Args[i]);
+            int type = arg_type(lArg3);
+            if (type == REGISTER) {
+              int reg = atoi(&lArg3[1]); 
+              line_bin += reg;
             }
-            // else, LABEL
+            if (type == NUM){
+              line_bin += toNum(lArg3);
+            }
+            break;
+          }
+          case MEM: {
+            // TODO
+            break;
+          } 
+          case FIXED: {
+            break;
+          }
+          case SHIFT: {
+            // TODO
+            break;
+          }
+          case TRAP: {
+            // TODO
+            break;
+          }
+          case PC_OFFSET: {
+            // TODO
+            break;
+          }
+          case JUMP: {
+            // TODO:
+            break;
+          }
+          default: {
+            printf("Error: Unsupported opcode type\n");
+            break;
           }
         }
 
-      
 
-        char lArg[MAX_LINE_LENGTH + 1];
+              
+        
+
+
+        /* my understanding is that my function will just take in one arg and you'll call it 
+            however many times you need from switch cases
+            - also, now you need to process whatever arg you passed in based on 
+              what type I return
+              - so for example toNum() if I return NUM
+              - REGISTER, number = Arg + 1, atoi(number)
+              - LABEL, iterate through array and add the digit that corrosponds to the name
+        */
+
+        char lArg[MAX_LINE_LENGTH + 1]; // I wrote this, but what even is the point? ig this was to proccess args, but it won't work
         strcpy(lArg, lArg1);
         for(int n = 1; n <= 2; n++) {
           printf("%s\n", lArg);
