@@ -7,36 +7,18 @@ UTEID 2: AML6995
 
 /*
 TODO :
-1. make a label struct - DONE
-2. make instruction array, invalid array - DONE
-  a. and other words??? FOR?
-3. make a main loop "for new line: check for symbol", add to array... - DONE
-    a. EITHER ADD PSEUDO CODE IN ISVALID or IN 2ND PASS - DONE (2nd pass)
-    b. if not an instruction - DONE
-    c. len = 1-20 - DONE
-    d. for char (can we treat the whole thing as a string?) : 
+  a. and other invalid words??? FOR?
+  d. for char (can we treat the whole thing as a string?) : 
         is letter / num, add to array, else not a valid label - i don't even understand this question and I know I wrote it
-    e. WHAT DO WE DO IF JUST NOT VALID CODE, RETURN ERROR?
-*/
-
-/* 
-TODO : for runthrough 2 (instruction translation)
- * do testion with just one line of input
-1. decide on opcode name and decimal relationship, 
-  we can add it to opcode struct 
-  OR for loop existing struct and use that as an index into the decimal array @braden up to you
-2. shift bits
-  a. opcode decimal *2^12 
-  b. arg 
-    i. (only arg2 / 3) immediate through toNum
-    ii. R# --> # *2^(arg#)
-    iii. else, = label, so look it up (also keep a cntr like in symbol_table)
-  
+  e. WHAT DO WE DO IF JUST NOT VALID CODE, RETURN ERROR? 
+    --> don't have to handel this
 */
 
 /* TODO : Sept 13
   1. DONE - take care of arg decode --> type, ex) ADD imm vs Reg 
-  2. copy the reg code to all switch cases
+  2. Add the print line per insteruction, not just pseudo-op
+  3. copy the reg code to all switch cases
+  4. we need a PC, so we can do Label - PC
 
   TO TEST :
   1. arg_type() works
