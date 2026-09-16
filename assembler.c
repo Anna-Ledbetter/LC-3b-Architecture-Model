@@ -5,41 +5,10 @@ UTEID 1: BRM3367
 UTEID 2: AML6995
 */
 
-/*
-Questions :
-  a. and other invalid words??? FOR?
-  d. for char (can we treat the whole thing as a string?) : 
-        is letter / num, add to array, else not a valid label - i don't even understand this question and I know I wrote it
-  e. WHAT DO WE DO IF JUST NOT VALID CODE, RETURN ERROR? 
-    --> don't have to handel this
-
-TODO : Sept 13
-  1. DONE - take care of arg decode --> type, ex) ADD imm vs Reg 
-  2. MATH: negative NUM, Label
-  3. Add the print line per insteruction, not just pseudo-op
-  4. copy the reg code to all switch cases
-  5. we need a PC, so we can do Label - PC
-  6. cmd f "!!!" and "@Braden"
-
-  TO TEST :
-  1. arg_type() works
-  2. how does nzp get stored for BR? just Arg1?
-
-  REAL TESTING
-  1. try all from the lab1 doc
-  2. try to think of edge cases --> compare to example assembler output
-  3. really hit negatives (for imm and Label offsets)
-  4. just .orig, blank file, other weird cases
-  5. ask TA (maddie tonight) even before runing test?
-  5. submit test cases
-
-
-*/
-
 #include <stdio.h> /* standard input/output library */
 #include <stdlib.h> /* Standard C Library */
 #include <string.h> /* String operations library */
-#include <ctype.h> /* Library for useful character operations */
+#include <ctype.h> /* Library for useful character o  perations */
 #include <limits.h> /* Library for definitions of common variable type characteristics */
 
 #define MAX_LINE_LENGTH 255
@@ -60,6 +29,8 @@ TODO : Sept 13
   enum {REGISTER, LABEL, NUM};
 
 int prog_start;
+int pc;
+int symbol_count;
 
 typedef struct {
   char name[6]; 
@@ -77,7 +48,7 @@ opcode opcodes[28] = {
   {"jsrr",   0b0100000000000000, JUMP},
   {"ldb",    0b0010000000000000, MEM},
   {"ldw",    0b0110000000000000, MEM},
-  {"lea",    0b1110000000000000, MEM},
+  {"lea",    0b1110000000000000, PC_OFFSET},
   {"nop",    0b0000000000000000, FIXED},   // nzp=000, offset=0
   {"not",    0b1001000000111111, MATH},
   {"ret",    0b1100000111000000, FIXED},   // JMP with BaseR=R7 baked in
@@ -135,7 +106,7 @@ int isValid(char *str) {
   }
   int n = 0;
   while ( (n < 21) && (str[n] != '\0')) { 
-    if ( isalnum(str[n] == 0)) {
+    if ( isalnum(str[n]) == 0) { 
       return 0;
     }
     n++;
@@ -200,9 +171,6 @@ int readAndParse
 
 /* Note: MAX_LINE_LENGTH, OK, EMPTY_LINE, and DONE are defined values */
 
-int sext(int num, int bits) { // @Braden, what is this for?
-
-}
 
 int toNum( char * pStr )
 {
@@ -270,9 +238,42 @@ int toNum( char * pStr )
    }
 }
 
-int toBin(int num) { // @Braden, what is this for?
-
+int arg_type( char *pArg ) { // pass by val not ref, so it's read only (makes a copy var on)
+  if (pArg[0] == 'r' && isdigit(pArg[1]) && pArg[1] <= '7' && pArg[2] == '\0') {
+    return REGISTER;
+  }
+  if (isdigit(pArg[0]) || (pArg[0] == 'x') || (pArg[0] == '#') || (pArg[0] == '-')) {
+    return NUM;
+  }
+  return LABEL;
 }
+
+int calculate_offset (char *arg, int bits) {
+  int type = arg_type(arg);
+  int offset = 0;
+  if (type == LABEL) {
+    int pc_plus = pc + 2;
+    int m;
+    for (m = 0; m < symbol_count; m++) {
+      printf("\nname:%s, address:0x%.4X\n", symbol_table[m].name, symbol_table[m].address);
+      if (strcmp((symbol_table[m].name), arg) == 0) {
+        break;
+      }
+    }
+    offset = (symbol_table[m].address - pc_plus) / 2; 
+    printf("\noffset:%d, label_address:0x%.4X, pc_plus:0x%.4X\n", offset, symbol_table[m].address, pc_plus);
+  }
+
+  if (type == NUM){
+    offset = toNum(arg);
+  }
+
+  if ( offset < 0 ) { // if negative, sign extends first
+    offset += (1<<bits);
+  }
+  return offset;
+}
+
 
 int BuildSymbolTable(FILE *pInFile, Label symbol_table[]) {
     char lLine[MAX_LINE_LENGTH + 1], *lLabel, *lOpcode, 
@@ -283,11 +284,13 @@ int BuildSymbolTable(FILE *pInFile, Label symbol_table[]) {
     int line_count = 0;
 
     do{
+      printf("line_count:%d\n", line_count);
       lRet = readAndParse(pInFile, lLine, &lLabel, 
         &lOpcode, &lArg1, &lArg2, &lArg3, &lArg4);
         if (lRet != DONE && lRet != EMPTY_LINE){
           if (!strcmp(lOpcode, ".orig")) {
             prog_start = toNum(lArg1);
+            pc = prog_start;
           }
           if (strlen(lLabel)){
             if (isValid(lLabel)){
@@ -296,20 +299,14 @@ int BuildSymbolTable(FILE *pInFile, Label symbol_table[]) {
               i++;
             }
           }
+
+          if (isOpcode(lOpcode) == 1 || !strcmp(lOpcode, ".fill")){
+            line_count ++;
+          }
+
         }
-        line_count++;
     } while (lRet != DONE);
     return i;
-}
-
-int arg_type( char *pArg ) { // pass by val not ref, so it's read only (makes a copy var on)
-  if (pArg[0] == 'r') {
-    return REGISTER;
-  }
-  if (isdigit(pArg[0]) || (pArg[0] == 'x') || (pArg[0] == '#') || (pArg[0] == '-')) {
-    return NUM;
-  }
-  return LABEL;
 }
 
 int second_pass(FILE *pInFile, FILE *pOutfile) {
@@ -322,16 +319,26 @@ int second_pass(FILE *pInFile, FILE *pOutfile) {
   int i = 0;
   int line_count = 0;
   int line_bin;
-  int curr_bit = 0;
 
   do{
     lRet = readAndParse(pInFile, lLine, &lLabel, 
       &lOpcode, &lArg1, &lArg2, &lArg3, &lArg4);
       if (lRet != DONE && lRet != EMPTY_LINE){
-        if (!strcmp(lOpcode, ".orig") || !strcmp(lOpcode, ".fill")) {
-          lInstr = toNum(lArg1); 
-          printf("0x%.4X\n", lInstr);
+        if (!strcmp(lOpcode, ".orig")) {
+          lInstr = toNum(lArg1);
+          printf("Op: %s\n", lOpcode);  
+          printf("lInstr: 0x%.4X\n", lInstr);
           fprintf( pOutfile, "0x%.4X\n", lInstr );
+          return 1;
+        }
+        if (!strcmp(lOpcode, ".fill")) {
+          lInstr = toNum(lArg1);
+          lInstr &= 0xFFFF; // mask negative numbers to 16 bits
+          printf("Op: %s\n", lOpcode);  
+          printf("lInstr: 0x%.4X\n", lInstr);
+          fprintf( pOutfile, "0x%.4X\n", lInstr );
+          pc +=2;
+          return 1;
         }
         if (!strcmp(lOpcode, ".end")) {
           return 0;
@@ -341,90 +348,122 @@ int second_pass(FILE *pInFile, FILE *pOutfile) {
         int i;
         for (i=0; i<28; i++) {
           if (!strcmp(lOpcode, opcodes[i].name)) {
-            line_bin = opcodes[i].binary;
-            curr_bit += 4;
+            lInstr = opcodes[i].binary;
+            break;
           }
         }
+        printf("i: %d\n", i);
+        printf("type: %d\n", opcodes[i].type);
+
 
         switch (opcodes[i].type) {
           case MATH: {
             int reg = atoi(&lArg1[1]); // only care about register number
-            line_bin += (reg * (1<<9) );
+            printf("Arg1: %c\n", lArg1[1]);
+            lInstr += (reg * (1<<9) );
 
-            int reg = atoi(&lArg2[1]); 
-            line_bin += reg * (1<<9);
+            reg = atoi(&lArg2[1]); 
+            lInstr += reg * (1<<6);
 
             int type = arg_type(lArg3);
             if (type == REGISTER) {
-              int reg = atoi(&lArg3[1]); 
-              line_bin += reg;
+              reg = atoi(&lArg3[1]); 
+              lInstr += reg;
             }
             if (type == NUM){
-              // ADD if negative, sign extend first !!!
-              line_bin += toNum(lArg3);
+              int imm = toNum(lArg3);
+              if ( imm < 0 ) { // if negative, sign extends first
+                imm += 32;
+              }
+              lInstr += imm;
+              lInstr += (1<<5); // ctrl bit
             }
-            if (type == LABEL) {
-              // line_bin += (Label - PC+)
-              // but we need a PC+ we inc
-            }
+            // for valid assembly, MATH won't have Label args
             break;
           }
           case MEM: {
-            // TODO
+            int reg = atoi(&lArg1[1]); // only care about register number
+            lInstr += (reg * (1<<9) );
+
+            reg = atoi(&lArg2[1]); 
+            lInstr += reg * (1<<6);
+
+            // should always be NUM 
+            int imm = toNum(lArg3);
+            if ( imm < 0 ) { // if negative, sign extends first
+              imm += 64;
+            }
+            lInstr += imm;
             break;
           } 
           case FIXED: {
             break;
           }
           case SHIFT: {
-            // TODO
+            int reg = atoi(&lArg1[1]); // only care about register number
+            lInstr += (reg * (1<<9) );
+
+            reg = atoi(&lArg2[1]); 
+            lInstr += reg * (1<<6);
+
+            // should always be pos NUM 
+            int imm = toNum(lArg3);
+            lInstr += imm;
+
             break;
           }
           case TRAP: {
-            // TODO
+            // should always be pos NUM 
+            int imm = toNum(lArg1);
+            lInstr += imm;
             break;
           }
-          case PC_OFFSET: {
-            // TODO
+          case PC_OFFSET: { // check nzp is one arg, offset / label is arg2
+            int offset;
+      
+            if (!strcmp(lOpcode, "lea")) { // LEA
+              int reg = atoi(&lArg1[1]); // only care about register number
+              printf("\nArg1: %c\n", lArg1[1]);
+              printf("Arg2: %s\n", lArg2);
+              lInstr += (reg * (1<<9) );
+
+              offset = calculate_offset(lArg2, 9);
+              lInstr += offset;
+            }
+            else if (!(lInstr & 0xF000)) {
+              printf("Op:%s, Arg1: %s\n", lOpcode, lArg1);
+              offset = calculate_offset(lArg1, 9);
+              lInstr += offset;
+            }
+            else if (!strcmp(lOpcode, "jsr")) {
+              offset = calculate_offset(lArg1, 11);
+              lInstr += offset;
+            }
+              
             break;
           }
           case JUMP: {
-            // TODO:
+            int reg = atoi(&lArg1[1]);
+            printf("\nArg1: %c\n", lArg1[1]);
+            lInstr += reg * (1<<6);
             break;
           }
+
           default: {
             printf("Error: Unsupported opcode type\n");
             break;
           }
         }
-
-
-              
         
-
-
-        /* my understanding is that my function will just take in one arg and you'll call it 
-            however many times you need from switch cases
-            - also, now you need to process whatever arg you passed in based on 
-              what type I return
-              - so for example toNum() if I return NUM
-              - REGISTER, number = Arg + 1, atoi(number)
-              - LABEL, iterate through array and add the digit that corrosponds to the name
-        */
-
-        char lArg[MAX_LINE_LENGTH + 1]; // I wrote this, but what even is the point? ig this was to proccess args, but it won't work
-        strcpy(lArg, lArg1);
-        for(int n = 1; n <= 2; n++) {
-          printf("%s\n", lArg);
-          
-          strcpy(lArg, lArg2);
-        }
+        printf("Op: %s\n", lOpcode);
+        printf("lInstr: 0x%.4X\n", lInstr);
+        fprintf( pOutfile, "0x%.4X\n", lInstr );
+        pc += 2;
         return 1;
       }
       line_count++;
   } while (lRet != DONE);
   return i;
-
 }
 
 int main (int argc, char* argv[]) {
@@ -452,12 +491,12 @@ int main (int argc, char* argv[]) {
     }
 
     // first pass: symbol table
-    int symbol_count = BuildSymbolTable(infile, symbol_table);
+    symbol_count = BuildSymbolTable(infile, symbol_table);
 
     for(int i=0; i<symbol_count; i++){
-      printf("Name: %s\nAddress: %d\n\n", symbol_table[i].name, symbol_table[i].address);
+      printf("Name: %s\nAddress: 0x%.4X\n\n", symbol_table[i].name, symbol_table[i].address);
     }
-    printf("Program Start: %d\n", prog_start);
+    printf("Program Start: 0x%.4X\n", prog_start);
 
     // second pass
     rewind(infile);
