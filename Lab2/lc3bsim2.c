@@ -440,6 +440,8 @@ void process_instruction(){
     int Arg3 = instr & 0x7;
     int val1;
     int val2;
+    int MAR;
+    int MDR;
     bool set_cc = 0;
 
 
@@ -472,7 +474,7 @@ void process_instruction(){
             else {
                 val2 = (CURRENT_LATCHES.REGS[(instr & 0x7)] );
             }
-            CURRENT_LATCHES.REGS[Arg1] = val1 + val2;
+            NEXT_LATCHES.REGS[Arg1] = val1 + val2;
             printf("Arg1 (DR): 0x%.4X\n", Arg1);
             printf("Arg2 (SR1): 0x%.4X\n", Arg2);
             printf("Arg3 (SR2 or imm5): 0x%.4X\n", Arg3);
@@ -496,8 +498,28 @@ void process_instruction(){
         }
 
         case 0x4: {        /* 0b0100 - JSR (bit[11]=1, PCoffset11) / JSRR (bit[11]=0, BaseR) */
+            NEXT_LATCHES.REGS[7] = NEXT_LATCHES.PC;
+            int NEXT_PC;
+            if ( (instr >> 5) & 0x1) { // ctrl bit
+                NEXT_PC = NEXT_LATCHES.PC + ( (instr & 0x7FF) << 1);
+                if(NEXT_PC & 0x400){
+                    NEXT_PC = NEXT_PC | 0xF800;
+                }
+            } else {
+                NEXT_PC = CURRENT_LATCHES.REGS[(instr & 0x1C0) >> 6];
+            }
+            NEXT_LATCHES.PC = NEXT_PC;
+            printf("NEXT_LATCHES.REGS[7]: 0x%.4X\n", NEXT_LATCHES.REGS[7]);
+            printf("Control bit: %d\n", (instr >> 5) & 0x1);
+            printf("Intermediate NEXT_PC (before sign extension): 0x%.4X\n", NEXT_LATCHES.PC + ((instr & 0x7FF) << 1));
+            if ((instr >> 5) & 0x1) { // If control bit is set
+                printf("NEXT_PC after sign extension: 0x%.4X\n", NEXT_PC);
+            } else {
+                printf("NEXT_PC from BaseR: 0x%.4X\n", NEXT_PC);
+            }
+            printf("Updated NEXT_LATCHES.PC: 0x%.4X\n", NEXT_LATCHES.PC);
             break;
-        }
+        }   
 
         case 0x5: {        /* 0b0101 - AND */
             /* DR, SR1, then SR2 or imm5 */
@@ -516,20 +538,8 @@ void process_instruction(){
             break;
         }
 
-        case 0x8: {        /* 0b1000 - RTI (no operands) */
-            break;
-        }
-
         case 0x9: {        /* 0b1001 - XOR, and NOT (XOR with imm5 = 0b11111) */
             set_cc = TRUE;
-            break;
-        }
-
-        case 0xA: {        /* 0b1010 - unused in LC-3b */
-            break;
-        }
-
-        case 0xB: {        /* 0b1011 - unused in LC-3b */
             break;
         }
 
@@ -547,8 +557,11 @@ void process_instruction(){
             break;
         }
 
-        case 0xF: {        /* 0b1111 - TRAP, and HALT (TRAP x25) */
-            NEXT_LATCHES.PC = 0x0000;
+        case 0xF: {        // TRAP 0x25 = HALT
+            CURRENT_LATCHES.REGS[7] = NEXT_LATCHES.PC;
+            MAR = ( (instr & 0xFF) << 1);
+            MDR = ( MEMORY[MAR][0] | (MEMORY[MAR][1] << 8));
+            NEXT_LATCHES.PC = ( MEMORY[MDR][0] | (MEMORY[MDR][1] << 8)); // should be 0x0000
             break;
         }
 
@@ -557,8 +570,8 @@ void process_instruction(){
             exit(4);
         }
     } 
+
     // WRITE BACK: update NEXT_LATCHES CC
-    /*
     if (set_cc) {
         if (CURRENT_LATCHES.REGS[Arg1] > 0) { // set CC
             NEXT_LATCHES.N = 0;
@@ -576,7 +589,4 @@ void process_instruction(){
             NEXT_LATCHES.P = 0;
         }
     } 
-    */
-    printf("Press Enter to continue...\n");
-    getchar(); // Waits for the user to press Enter
 }
