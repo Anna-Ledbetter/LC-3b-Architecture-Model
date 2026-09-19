@@ -407,12 +407,21 @@ int main(int argc, char *argv[]) {
 
 /***************************************************************/
 
-int sext(int val, int bits) {
+int sext(int val, int bits) { 
   val &= (1 << bits); // get first bit
-  if (val & (1 << (bits - 1))){
+  if (val & (1 << (bits - 1))){  // @braden for bits = 5 --> 0x100000 & 0x10000 
     val -= (1 << bits);
   }
   return val;
+}
+
+int mask_and_sext(int instr, int bits) { // bits = bit length of offset
+    int mask = (1 << bits ) - 1; // ex) for bits = 5, 0x1000000 --> 0x011111
+    int val = instr & mask;
+    if ( val & (1 << (bits-1)) ) { // if negative, sign extend
+        val = val | (~mask) ; // mask everything above bits to 1
+    }
+    return val;
 }
 
 
@@ -438,13 +447,23 @@ void process_instruction(){
     int Arg1 = ( instr >> 9 ) & 0x7;
     int Arg2 = ( instr >> 6 ) & 0x7;
     int Arg3 = instr & 0x7;
-    int val1;
+    // for MATH
+    int val1 = CURRENT_LATCHES.REGS[(Arg2)];
     int val2;
+    if ( (instr >> 5) & 0x1) { // ctrl bit
+        val2 = mask_and_sext(instr, 5);
+    } else {
+        val2 = (CURRENT_LATCHES.REGS[(instr & 0x7)] );
+    }
+    // for MEM
     int MAR;
     int MDR;
     bool set_cc = 0;
+    // for
+    int offset;
 
 
+// DECODE + EXECUTE
     NEXT_LATCHES.PC = CURRENT_LATCHES.PC + 2; 
 
     printf("instr: 0x%.4X\n", instr);
@@ -466,22 +485,42 @@ void process_instruction(){
             break;
         }
 
-        case 0x1: {     // ADD 
-            val1 = CURRENT_LATCHES.REGS[(Arg2)];
-            if ( (instr >> 5) & 0x1) { // ctrl bit
-                val2 = (instr & 0b11111 );
-            }
-            else {
-                val2 = (CURRENT_LATCHES.REGS[(instr & 0x7)] );
-            }
+        case 0x1: { // ADD 
+// @ braden, I'm setting the regs to actual neg decimal value (-5)
+// which equates to 32 bit long value 0xFFFFFFFB, 
+// but real reg are only 16b so idk if we are graded on 
+// the bit representation or the decimal value
             NEXT_LATCHES.REGS[Arg1] = val1 + val2;
             printf("Arg1 (DR): 0x%.4X\n", Arg1);
             printf("Arg2 (SR1): 0x%.4X\n", Arg2);
             printf("Arg3 (SR2 or imm5): 0x%.4X\n", Arg3);
             printf("val1 (from Arg2): 0x%.4X\n", val1);
             printf("val2 (from Arg3 or imm5): 0x%.4X\n", val2);
-            printf("Result (stored in DR): 0x%.4X\n", CURRENT_LATCHES.REGS[Arg1]);
-        
+            printf("Result (stored in DR): 0x%.4X\n", NEXT_LATCHES.REGS[Arg1]);
+            set_cc = TRUE;
+            break;
+        }
+
+        case 0x5: { // AND 
+            NEXT_LATCHES.REGS[Arg1] = val1 & val2;
+            printf("Arg1 (DR): 0x%.4X\n", Arg1);
+            printf("Arg2 (SR1): 0x%.4X\n", Arg2);
+            printf("Arg3 (SR2 or imm5): 0x%.4X\n", Arg3);
+            printf("val1 (from Arg2): 0x%.4X\n", val1);
+            printf("val2 (from Arg3 or imm5): 0x%.4X\n", val2);
+            printf("Result (stored in DR): 0x%.4X\n", NEXT_LATCHES.REGS[Arg1]);
+            set_cc = TRUE;
+            break;
+        }
+
+        case 0x9: { // XOR
+            NEXT_LATCHES.REGS[Arg1] = val1 ^ val2;
+            printf("Arg1 (DR): 0x%.4X\n", Arg1);
+            printf("Arg2 (SR1): 0x%.4X\n", Arg2);
+            printf("Arg3 (SR2 or imm5): 0x%.4X\n", Arg3);
+            printf("val1 (from Arg2): 0x%.4X\n", val1);
+            printf("val2 (from Arg3 or imm5): 0x%.4X\n", val2);
+            printf("Result (stored in DR): 0x%.4X\n", NEXT_LATCHES.REGS[Arg1]);
             set_cc = TRUE;
             break;
         }
@@ -497,35 +536,20 @@ void process_instruction(){
             break;
         }
 
-        case 0x4: {        /* 0b0100 - JSR (bit[11]=1, PCoffset11) / JSRR (bit[11]=0, BaseR) */
+        case 0x4: { // JSR,JSRR
             NEXT_LATCHES.REGS[7] = NEXT_LATCHES.PC;
-            int NEXT_PC;
-            if ( (instr >> 5) & 0x1) { // ctrl bit
-                NEXT_PC = NEXT_LATCHES.PC + ( (instr & 0x7FF) << 1);
-                if(NEXT_PC & 0x400){
-                    NEXT_PC = NEXT_PC | 0xF800;
-                }
+            if ( instr & (1 << 11)) { // ctrl bit
+                offset = mask_and_sext(instr, 10);
+                NEXT_LATCHES.PC = (NEXT_LATCHES.PC + ( offset << 1)) & 0xFFFF;
             } else {
-                NEXT_PC = CURRENT_LATCHES.REGS[(instr & 0x1C0) >> 6];
+                NEXT_LATCHES.PC = CURRENT_LATCHES.REGS[(instr & 0x1C0) >> 6];
             }
-            NEXT_LATCHES.PC = NEXT_PC;
             printf("NEXT_LATCHES.REGS[7]: 0x%.4X\n", NEXT_LATCHES.REGS[7]);
-            printf("Control bit: %d\n", (instr >> 5) & 0x1);
-            printf("Intermediate NEXT_PC (before sign extension): 0x%.4X\n", NEXT_LATCHES.PC + ((instr & 0x7FF) << 1));
-            if ((instr >> 5) & 0x1) { // If control bit is set
-                printf("NEXT_PC after sign extension: 0x%.4X\n", NEXT_PC);
-            } else {
-                printf("NEXT_PC from BaseR: 0x%.4X\n", NEXT_PC);
-            }
+            printf("Control bit: %d\n", (instr & (1 << 11)));
+            printf("offset: 0x%.4X\n", offset);
             printf("Updated NEXT_LATCHES.PC: 0x%.4X\n", NEXT_LATCHES.PC);
             break;
         }   
-
-        case 0x5: {        /* 0b0101 - AND */
-            /* DR, SR1, then SR2 or imm5 */
-            set_cc = TRUE;
-            break;
-        }
 
         case 0x6: {        /* 0b0110 - LDW */
             /* DR, BaseR, offset6 */
@@ -538,12 +562,10 @@ void process_instruction(){
             break;
         }
 
-        case 0x9: {        /* 0b1001 - XOR, and NOT (XOR with imm5 = 0b11111) */
-            set_cc = TRUE;
-            break;
-        }
-
-        case 0xC: {        /* 0b1100 - JMP, and RET (JMP with BaseR = R7) */
+        case 0xC: {        // JMP, RET(=JMP R7)
+            NEXT_LATCHES.PC = CURRENT_LATCHES.REGS[(instr & 0x1C0) >> 6];
+            printf("Reg: 0x%.4X\n", instr & 0x1C0);
+            printf("Updated NEXT_LATCHES.PC: 0x%.4X\n", NEXT_LATCHES.PC);
             break;
         }
 
@@ -557,7 +579,7 @@ void process_instruction(){
             break;
         }
 
-        case 0xF: {        // TRAP 0x25 = HALT
+        case 0xF: { // TRAP 0x25 = HALT
             CURRENT_LATCHES.REGS[7] = NEXT_LATCHES.PC;
             MAR = ( (instr & 0xFF) << 1);
             MDR = ( MEMORY[MAR][0] | (MEMORY[MAR][1] << 8));
@@ -573,20 +595,26 @@ void process_instruction(){
 
     // WRITE BACK: update NEXT_LATCHES CC
     if (set_cc) {
-        if (CURRENT_LATCHES.REGS[Arg1] > 0) { // set CC
-            NEXT_LATCHES.N = 0;
-            NEXT_LATCHES.Z = 0;
+        NEXT_LATCHES.N = 0;
+        NEXT_LATCHES.Z = 0;
+        NEXT_LATCHES.P = 0; 
+        if (NEXT_LATCHES.REGS[Arg1] > 0) { // every to set_cc, DR = Arg1
             NEXT_LATCHES.P = 1;
-        }
-        else if (CURRENT_LATCHES.REGS[Arg1] < 0) {
-            NEXT_LATCHES.N = 1;
-            NEXT_LATCHES.Z = 0;
-            NEXT_LATCHES.P = 0;  
-        } 
-        else {
-            NEXT_LATCHES.N = 0;
+        } else if (NEXT_LATCHES.REGS[Arg1] < 0) {
+            NEXT_LATCHES.N = 1;  
+        } else {
             NEXT_LATCHES.Z = 1;
-            NEXT_LATCHES.P = 0;
         }
     } 
 }
+
+/*
+@braden I learned we can test with this from the TA's
+ ./simulate program.asm mem.asm // fills memory with mem.asm values
+ 
+ mem.asm
+ 0x5000 // at this address
+ 0x2394
+ 0x0002
+ 0x00A1
+*/
