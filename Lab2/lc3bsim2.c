@@ -448,12 +448,12 @@ void process_instruction(){
     int Arg2 = ( instr >> 6 ) & 0x7;
     int Arg3 = instr & 0x7;
     // for MATH
-    int val1 = CURRENT_LATCHES.REGS[(Arg2)];
+    int val1 = mask_and_sext(CURRENT_LATCHES.REGS[(Arg2)], 16);
     int val2;
     if ( (instr >> 5) & 0x1) { // ctrl bit
         val2 = mask_and_sext(instr, 5);
     } else {
-        val2 = (CURRENT_LATCHES.REGS[(instr & 0x7)] );
+        val2 = mask_and_sext(CURRENT_LATCHES.REGS[(instr & 0x7)], 16);
     }
     // for MEM
     int MAR;
@@ -486,11 +486,7 @@ void process_instruction(){
         }
 
         case 0x1: { // ADD 
-// @ braden, I'm setting the regs to actual neg decimal value (-5)
-// which equates to 32 bit long value 0xFFFFFFFB, 
-// but real reg are only 16b so idk if we are graded on 
-// the bit representation or the decimal value
-            NEXT_LATCHES.REGS[Arg1] = val1 + val2;
+            NEXT_LATCHES.REGS[Arg1] = Low16bits(val1 + val2);
             printf("Arg1 (DR): 0x%.4X\n", Arg1);
             printf("Arg2 (SR1): 0x%.4X\n", Arg2);
             printf("Arg3 (SR2 or imm5): 0x%.4X\n", Arg3);
@@ -502,7 +498,7 @@ void process_instruction(){
         }
 
         case 0x5: { // AND 
-            NEXT_LATCHES.REGS[Arg1] = val1 & val2;
+            NEXT_LATCHES.REGS[Arg1] = Low16bits(val1 & val2);
             printf("Arg1 (DR): 0x%.4X\n", Arg1);
             printf("Arg2 (SR1): 0x%.4X\n", Arg2);
             printf("Arg3 (SR2 or imm5): 0x%.4X\n", Arg3);
@@ -514,7 +510,7 @@ void process_instruction(){
         }
 
         case 0x9: { // XOR
-            NEXT_LATCHES.REGS[Arg1] = val1 ^ val2;
+            NEXT_LATCHES.REGS[Arg1] = Low16bits(val1 ^ val2);
             printf("Arg1 (DR): 0x%.4X\n", Arg1);
             printf("Arg2 (SR1): 0x%.4X\n", Arg2);
             printf("Arg3 (SR2 or imm5): 0x%.4X\n", Arg3);
@@ -540,7 +536,7 @@ void process_instruction(){
             NEXT_LATCHES.REGS[7] = NEXT_LATCHES.PC;
             if ( instr & (1 << 11)) { // ctrl bit
                 offset = mask_and_sext(instr, 10);
-                NEXT_LATCHES.PC = (NEXT_LATCHES.PC + ( offset << 1)) & 0xFFFF;
+                NEXT_LATCHES.PC = Low16bits( (NEXT_LATCHES.PC + ( offset << 1)) );
             } else {
                 NEXT_LATCHES.PC = CURRENT_LATCHES.REGS[(instr & 0x1C0) >> 6];
             }
@@ -598,9 +594,9 @@ void process_instruction(){
         NEXT_LATCHES.N = 0;
         NEXT_LATCHES.Z = 0;
         NEXT_LATCHES.P = 0; 
-        if (NEXT_LATCHES.REGS[Arg1] > 0) { // every to set_cc, DR = Arg1
+        if (mask_and_sext(NEXT_LATCHES.REGS[Arg1], 16 ) > 0) { // every to set_cc, DR = Arg1
             NEXT_LATCHES.P = 1;
-        } else if (NEXT_LATCHES.REGS[Arg1] < 0) {
+        } else if (mask_and_sext(NEXT_LATCHES.REGS[Arg1], 16 ) < 0)  {
             NEXT_LATCHES.N = 1;  
         } else {
             NEXT_LATCHES.Z = 1;
