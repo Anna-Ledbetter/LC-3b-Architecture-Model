@@ -438,7 +438,6 @@ void process_instruction(){
     int opcode = ( instr >> 12 ) & 0xF;
     int Arg1 = ( instr >> 9 ) & 0x7;
     int Arg2 = ( instr >> 6 ) & 0x7;
-    int Arg3 = instr & 0x7;
     // for MATH
     int val1 = mask_and_sext(CURRENT_LATCHES.REGS[(Arg2)], 16);
     int val2;
@@ -465,9 +464,9 @@ void process_instruction(){
           // set BEN based on IR[11:9] & N,Z,P. Also set it for "BR" (unconditional)
           bool BEN = 
             (
-              ((instr & 0x0800) & CURRENT_LATCHES.N) 
-              | ((instr & 0x0400) & CURRENT_LATCHES.Z) 
-              | ((instr & 0x0200) & CURRENT_LATCHES.P)
+              ((instr & 0x0800) && CURRENT_LATCHES.N) 
+              | ((instr & 0x0400) && CURRENT_LATCHES.Z) 
+              | ((instr & 0x0200) && CURRENT_LATCHES.P)
               | !((instr & 0x0800) | (instr & 0x0400) | (instr & 0x0200))
             );
 
@@ -482,9 +481,8 @@ void process_instruction(){
             NEXT_LATCHES.REGS[Arg1] = Low16bits(val1 + val2);
             printf("Arg1 (DR): 0x%.4X\n", Arg1);
             printf("Arg2 (SR1): 0x%.4X\n", Arg2);
-            printf("Arg3 (SR2 or imm5): 0x%.4X\n", Arg3);
             printf("val1 (from Arg2): 0x%.4X\n", val1);
-            printf("val2 (from Arg3 or imm5): 0x%.4X\n", val2);
+            printf("val2 (from val2 or imm5): 0x%.4X\n", val2);
             printf("Result (stored in DR): 0x%.4X\n", NEXT_LATCHES.REGS[Arg1]);
             set_cc = TRUE;
             break;
@@ -494,9 +492,8 @@ void process_instruction(){
             NEXT_LATCHES.REGS[Arg1] = Low16bits(val1 & val2);
             printf("Arg1 (DR): 0x%.4X\n", Arg1);
             printf("Arg2 (SR1): 0x%.4X\n", Arg2);
-            printf("Arg3 (SR2 or imm5): 0x%.4X\n", Arg3);
             printf("val1 (from Arg2): 0x%.4X\n", val1);
-            printf("val2 (from Arg3 or imm5): 0x%.4X\n", val2);
+            printf("val2 (from val2 or imm5): 0x%.4X\n", val2);
             printf("Result (stored in DR): 0x%.4X\n", NEXT_LATCHES.REGS[Arg1]);
             set_cc = TRUE;
             break;
@@ -506,9 +503,8 @@ void process_instruction(){
             NEXT_LATCHES.REGS[Arg1] = Low16bits(val1 ^ val2);
             printf("Arg1 (DR): 0x%.4X\n", Arg1);
             printf("Arg2 (SR1): 0x%.4X\n", Arg2);
-            printf("Arg3 (SR2 or imm5): 0x%.4X\n", Arg3);
             printf("val1 (from Arg2): 0x%.4X\n", val1);
-            printf("val2 (from Arg3 or imm5): 0x%.4X\n", val2);
+            printf("val2 (from val2 or imm5): 0x%.4X\n", val2);
             printf("Result (stored in DR): 0x%.4X\n", NEXT_LATCHES.REGS[Arg1]);
             set_cc = TRUE;
             break;
@@ -533,7 +529,7 @@ void process_instruction(){
         case 0x4: { // JSR,JSRR
             NEXT_LATCHES.REGS[7] = NEXT_LATCHES.PC;
             if ( instr & (1 << 11)) { // ctrl bit
-                offset = mask_and_sext(instr, 10);
+                offset = mask_and_sext(instr, 11);
                 NEXT_LATCHES.PC = Low16bits( (NEXT_LATCHES.PC + ( offset << 1)) );
             } else {
                 NEXT_LATCHES.PC = CURRENT_LATCHES.REGS[(instr & 0x1C0) >> 6];
@@ -547,8 +543,8 @@ void process_instruction(){
 
         case 0x6: { // LDW
             offset = mask_and_sext(instr, 6);
-            MAR = Low16bits(CURRENT_LATCHES.REGS[Arg2] + offset*2);
-            MDR = MEMORY[MAR >> 1][0] | MEMORY[MAR >> 1][1];
+            MAR = Low16bits(CURRENT_LATCHES.REGS[Arg2] + (offset*2));
+            MDR = MEMORY[MAR >> 1][0] | (MEMORY[MAR >> 1][1] << 8);
             NEXT_LATCHES.REGS[Arg1] = Low16bits(MDR);
             set_cc = TRUE;
             break;
@@ -569,7 +565,7 @@ void process_instruction(){
             break;
         }
 
-        case 0xD: {
+        case 0xD: { // SHF
             if ( !(instr & 0x0010) ) {
                 NEXT_LATCHES.REGS[Arg1] = Low16bits( CURRENT_LATCHES.REGS[Arg2] << (instr & 0x000F));
             } else if ( !(instr & 0x0020) ) {
@@ -588,10 +584,10 @@ void process_instruction(){
         }
 
         case 0xF: { // TRAP 0x25 = HALT
-            CURRENT_LATCHES.REGS[7] = NEXT_LATCHES.PC;
+            NEXT_LATCHES.REGS[7] = NEXT_LATCHES.PC;
             MAR = ( (instr & 0xFF) << 1);
-            MDR = ( MEMORY[MAR][0] | (MEMORY[MAR][1] << 8));
-            NEXT_LATCHES.PC = ( MEMORY[MDR][0] | (MEMORY[MDR][1] << 8)); // should be 0x0000
+            MDR = ( MEMORY[MAR >> 1][0] | (MEMORY[MAR >> 1][1] << 8));
+            NEXT_LATCHES.PC = ( MEMORY[MDR >> 1][0] | (MEMORY[MDR >> 1][1] << 8)); // should be 0x0000
             break;
         }
 
@@ -615,14 +611,3 @@ void process_instruction(){
         }
     } 
 } 
-
-/*
-@braden I learned we can test with this from the TA's
- ./simulate program.asm mem.asm // fills memory with mem.asm values
- 
- mem.asm
- 0x5000 // at this address
- 0x2394
- 0x0002
- 0x00A1
-*/
